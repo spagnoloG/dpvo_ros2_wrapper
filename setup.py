@@ -15,6 +15,7 @@ setup(
             os.path.join("share", package_name, "launch"),
             glob(os.path.join("launch", "*.py")),
         ),
+        ("share/dpvo_ros2_wrapper/config", glob("config/*")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,

@@ -371,7 +371,7 @@ def run_dpvo(
 
         if slam is None:
             _, H, W = image.shape
-            slam = DPVO(cfg, network, ht=H, wd=W, viz=viz)
+            slam = DPVO(cfg, network, ht=H, wd=W, viz=False)
 
         with Timer("SLAM", enabled=timeit):
             slam(t, image, intrinsics)

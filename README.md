@@ -18,10 +18,13 @@ All data are published in the `map` frame.
   - [System Dependencies](#system-dependencies)
   - [DPVO Setup in a Micromamba Environment](#dpvo-setup-in-a-micromamba-environment)
   - [DPVO Package Installation](#dpvo-package-installation)
+  - [CMake 3.31 Installation](#cmake-331-installation)
   - [Pangolin Installation (Optional)](#pangolin-installation-optional)
+  - [Wrapper Setup](#wrapper-setup)
+- [Exposed Topics](#exposed-topics)
 - [Usage](#usage)
   - [Running the ROS2 Publisher Node](#running-the-ros2-publisher-node)
-  - [Exposed Topics](#exposed-topics)
+  - [Data Flow and Topic Details](#data-flow-and-topic-details)
 - [Contributing](#contributing)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
@@ -30,7 +33,7 @@ All data are published in the `map` frame.
 
 ## Overview
 
-The `dpvo_ros2_wrapper` bridges DPVO with ROS2. It launches a Python-based ROS2 node that wraps the DPVO pipeline. The node:
+The `dpvo_ros2_wrapper` bridges DPVO with ROS2 by launching a Python-based node that wraps the DPVO pipeline. The node:
 - Reads images (or video) and calibration files,
 - Runs DPVO to obtain pose, point cloud, and image data,
 - Publishes the current pose as a TF transform,
@@ -45,7 +48,7 @@ The `dpvo_ros2_wrapper` bridges DPVO with ROS2. It launches a Python-based ROS2 
 
 Ensure your system meets these prerequisites:
 - Ubuntu 20.04/22.04
-- CUDA 12 
+- CUDA 12
 - Python 3.8+ (with pip)
 - ROS2 (Foxy, Humble, or Rolling)
 - Standard build tools (e.g., gcc, cmake)
@@ -95,21 +98,21 @@ sudo apt-get install -y build-essential cmake git libopencv-dev pkg-config
    ./download_models_and_data.sh
    ```
 
-### CMake 3.31 version installation
+### CMake 3.31 Installation
 
-1. Remove Old CMake (Optional)
+1. **Remove Old CMake (Optional)**
    ```bash
    sudo apt remove --purge cmake
    ```
 
-2. Download and Extract CMake 3.31
+2. **Download and Extract CMake 3.31**
    ```bash
    wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0.tar.gz
    tar -xvzf cmake-3.31.0.tar.gz
    cd cmake-3.31.0
    ```
 
-3. Build and Install
+3. **Build and Install**
    ```bash
    ./bootstrap
    make -j$(nproc)
@@ -133,8 +136,9 @@ For real-time visualization via the DPVO viewer:
    pip install ./DPViewer
    ```
 
-### Wrapper setup
+### Wrapper Setup
 
+Clone the wrapper repository and build the workspace:
 ```bash
 mkdir -p ~/colcon_ws/src
 cd ~/colcon_ws/src
@@ -145,11 +149,64 @@ colcon build
 
 ---
 
+## Exposed Topics
+
+The `dpvo_ros2_wrapper` node publishes several ROS2 topics to facilitate integration with other ROS2 applications.
+
+### Published Topics
+
+- **`/trajectory_markers`**  
+  - **Message Type:** `visualization_msgs/msg/MarkerArray`  
+  - **Description:** Publishes the full trajectory as a line strip marker, visualizing the path of the camera/drone.
+
+- **`/camera_frustums`**  
+  - **Message Type:** `visualization_msgs/msg/MarkerArray`  
+  - **Description:** Publishes camera frustum markers (one per pose) that mimic the DPVO viewer visualization.
+
+- **`/point_cloud`**  
+  - **Message Type:** `sensor_msgs/msg/PointCloud2`  
+  - **Description:** Publishes a point cloud built from DPVO point/color data for 3D visualization.
+
+- **`/image_stream`**  
+  - **Message Type:** `sensor_msgs/msg/Image`  
+  - **Description:** Publishes an image stream output from the DPVO pipeline.
+
+### TF Transforms
+
+- **TF Broadcast:**  
+  - **Frames:** A transform is broadcast from the `map` frame to the `drone` frame using `tf2_ros/TransformBroadcaster`, representing the current pose of the camera/drone.
+
+---
+
 ## Usage
 
+### Running the ROS2 Publisher Node
 
+After building the workspace, source the setup file and launch the node:
 ```bash
-micromamba activate dpvo
+cd ~/colcon_ws
+source install/setup.bash
+ros2 launch dpvo_ros2_wrapper dpvo_ros2_wrapper_launch.py
+```
+
+### Data Flow and Topic Details
+
+- **Input Data:**  
+  The wrapper takes an image directory (or video file), along with calibration, network, and configuration files as input parameters.
+
+- **Processing:**  
+  The DPVO pipeline processes the input data to compute the current pose, trajectory, point cloud, and image stream.
+
+- **Output Data:**  
+  The processed data is published on the topics listed above:
+  - The **TF transform** provides the current pose of the camera/drone.
+  - **`/trajectory_markers`** visualizes the full trajectory.
+  - **`/camera_frustums`** displays individual camera frustums for each pose.
+  - **`/point_cloud`** and **`/image_stream`** offer detailed visualization in RViz.
+
+To disable the Pangolin viewer (if real-time DPVO visualization is not required), set the `--viz` flag to `false` when launching:
+```bash
+ros2 launch dpvo_ros2_wrapper dpvo_ros2_wrapper_launch.py --ros-args -p viz:=false
 ```
 
 ---
