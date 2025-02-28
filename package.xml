@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dpvo_ros2_wrapper</name>
+  <version>0.0.1</version>
+  <description>A ROS2 wrapper for DPVO (Deep Patch Visual Odometry/SLAM) that publishes DPVO outputs to ROS2 topics.</description>
+  <maintainer email="spagnolo.gasper@gmail.com">Gasper Spagnolo</maintainer>
+  <license>GPL-3.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>tf_transformations</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
