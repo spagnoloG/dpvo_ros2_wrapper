@@ -80,7 +80,6 @@ else:
 
 ##
 
-
 import os
 from pathlib import Path
 import cv2
@@ -100,8 +99,7 @@ from sensor_msgs.msg import PointCloud2, PointField, Image
 import struct
 from cv_bridge import CvBridge
 
-
-# Check if ~/Documents/DPVO exists fail otherwise
+# Check if ~/Documents/DPVO exists, fail otherwise
 if not os.path.exists(os.path.expanduser("~/Documents/DPVO")):
     raise FileNotFoundError("Directory ~/Documents/DPVO not found")
 else:
@@ -392,8 +390,15 @@ def run_dpvo(
             T = pose_to_matrix(translation, quat)
             T_inv = np.linalg.inv(T)
             center = T_inv[0:3, 3]
+            # Flip the z-axis to correct the upside down trajectory.
+            center[2] = -center[2]
+            # Apply correction to quaternion for a 180° rotation about the x-axis.
+            # Quaternion for 180° rotation about x-axis is [0, 1, 0, 0] (in [qw, qx, qy, qz] format).
+            q_corr = np.array([0.0, 1.0, 0.0, 0.0])
+            corrected_quat = tft.quaternion_multiply(q_corr, quat)
+
             trajectory_positions.append(center)
-            trajectory_orientations.append(quat)
+            trajectory_orientations.append(corrected_quat)
             trajectory_tstamps.append(t)
         else:
             print(f"Warning: No valid pose returned at timestamp {t}")
