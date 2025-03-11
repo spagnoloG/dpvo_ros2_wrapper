@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import os
@@ -19,7 +19,13 @@ def find_python_environment_path(env_name):
     return None
 
 
-def generate_launch_description():
+def launch_setup(context, *args, **kwargs):
+    """This function ensures LaunchConfiguration values are resolved at runtime."""
+    python_executable = find_python_environment_path("dpvo")
+    if python_executable is None:
+        print("Python environment 'dpvo' not found.")
+        exit(5)
+
     dpvo_dir = os.path.expanduser("~/Documents/DPVO")
     pkg_share = get_package_share_directory("dpvo_ros2_wrapper")
     if not os.path.exists(dpvo_dir):
@@ -28,11 +34,51 @@ def generate_launch_description():
         )
         exit(4)
 
-    python_executable = find_python_environment_path("dpvo")
-    if python_executable is None:
-        print("Python environment 'dpvo' not found.")
-        exit(5)
+    # Resolve LaunchConfiguration at runtime
+    opts = context.launch_configurations.get("opts", "").split(",")
+    opts_list = [item for opt in opts for item in opt.split("=")]
 
+    return [
+        Node(
+            package="rviz2",
+            executable="rviz2",
+            name="rviz",
+            output="screen",
+            arguments=["-d", os.path.join(pkg_share, "config", "dpvo.rviz")],
+        ),
+        Node(
+            package="dpvo_ros2_wrapper",
+            executable="dpvo_ros2_publisher",
+            name="dpvo_ros2_publisher",
+            output="screen",
+            exec_name=python_executable,
+            arguments=[
+                "--imagedir",
+                LaunchConfiguration("imagedir"),
+                "--calib",
+                LaunchConfiguration("calib"),
+                "--network",
+                LaunchConfiguration("network"),
+                "--config",
+                LaunchConfiguration("config"),
+                "--stride",
+                LaunchConfiguration("stride"),
+                "--skip",
+                LaunchConfiguration("skip"),
+                "--viz",
+                LaunchConfiguration("viz"),
+                "--plot",
+                LaunchConfiguration("plot"),
+                "--save_trajectory",
+                LaunchConfiguration("save_trajectory"),
+                "--opts",
+                *opts_list,  # Correctly split key-value pairs
+            ],
+        ),
+    ]
+
+
+def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -42,18 +88,25 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "network",
-                default_value=os.path.join(dpvo_dir, "dpvo.pth"),
+                default_value=os.path.join(
+                    os.path.expanduser("~/Documents/DPVO"), "dpvo.pth"
+                ),
                 description="Path to the DPVO network file",
             ),
             DeclareLaunchArgument(
                 "calib",
-                # default_value=os.path.join(dpvo_dir, "calib", "euroc.txt"),
-                default_value=os.path.join(pkg_share, "config", "DJI_2K_calib.txt"),
+                default_value=os.path.join(
+                    get_package_share_directory("dpvo_ros2_wrapper"),
+                    "config",
+                    "DJI_2K_calib.txt",
+                ),
                 description="Path to the calibration file",
             ),
             DeclareLaunchArgument(
                 "config",
-                default_value=os.path.join(dpvo_dir, "config", "default.yaml"),
+                default_value=os.path.join(
+                    os.path.expanduser("~/Documents/DPVO"), "config", "default.yaml"
+                ),
                 description="Path to the DPVO configuration file",
             ),
             DeclareLaunchArgument(
@@ -75,39 +128,11 @@ def generate_launch_description():
                 default_value="true",
                 description="Save trajectory to a file",
             ),
-            Node(
-                package="rviz2",
-                executable="rviz2",
-                name="rviz",
-                output="screen",
-                arguments=["-d", os.path.join(pkg_share, "config", "dpvo.rviz")],
+            DeclareLaunchArgument(
+                "opts",
+                default_value="CLASSIC_LOOP_CLOSURE=True",
+                description="Options to override DPVO configuration",
             ),
-            Node(
-                package="dpvo_ros2_wrapper",
-                executable="dpvo_ros2_publisher",
-                name="dpvo_ros2_publisher",
-                output="screen",
-                exec_name=python_executable,
-                arguments=[
-                    "--imagedir",
-                    LaunchConfiguration("imagedir"),
-                    "--calib",
-                    LaunchConfiguration("calib"),
-                    "--network",
-                    LaunchConfiguration("network"),
-                    "--config",
-                    LaunchConfiguration("config"),
-                    "--stride",
-                    LaunchConfiguration("stride"),
-                    "--skip",
-                    LaunchConfiguration("skip"),
-                    "--viz",
-                    LaunchConfiguration("viz"),
-                    "--plot",
-                    LaunchConfiguration("plot"),
-                    "--save_trajectory",
-                    LaunchConfiguration("save_trajectory"),
-                ],
-            ),
+            OpaqueFunction(function=launch_setup),
         ]
     )
