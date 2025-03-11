@@ -37,7 +37,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "imagedir",
-                default_value="/home/gasper/Datasets/EuRoc/MH01/mav0/cam0/data",
+                default_value="/home/gasper/Datasets/UAV-LOC-DATASET/FRI-110m-sunny.mp4",
                 description="Path to the image directory or video file",
             ),
             DeclareLaunchArgument(
@@ -47,7 +47,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "calib",
-                default_value=os.path.join(dpvo_dir, "calib", "euroc.txt"),
+                # default_value=os.path.join(dpvo_dir, "calib", "euroc.txt"),
+                default_value=os.path.join(pkg_share, "config", "DJI_2K_calib.txt"),
                 description="Path to the calibration file",
             ),
             DeclareLaunchArgument(
@@ -56,7 +57,7 @@ def generate_launch_description():
                 description="Path to the DPVO configuration file",
             ),
             DeclareLaunchArgument(
-                "stride", default_value="2", description="Stride parameter for DPVO"
+                "stride", default_value="8", description="Stride parameter for DPVO"
             ),
             DeclareLaunchArgument(
                 "skip", default_value="0", description="Skip parameter for DPVO"
@@ -68,6 +69,11 @@ def generate_launch_description():
                 "plot",
                 default_value="true",
                 description="Enable ROS TF, trajectory, point cloud, and image publishing",
+            ),
+            DeclareLaunchArgument(
+                "save_trajectory",
+                default_value="true",
+                description="Save trajectory to a file",
             ),
             Node(
                 package="rviz2",
@@ -99,6 +105,8 @@ def generate_launch_description():
                     LaunchConfiguration("viz"),
                     "--plot",
                     LaunchConfiguration("plot"),
+                    "--save_trajectory",
+                    LaunchConfiguration("save_trajectory"),
                 ],
             ),
         ]
