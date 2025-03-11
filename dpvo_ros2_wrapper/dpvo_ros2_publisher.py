@@ -117,6 +117,8 @@ import json
 
 import tf_transformations as tft
 import argparse
+import signal
+import sys
 
 SKIP = 0
 
@@ -467,6 +469,21 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
+def publish_status(status_text):
+    """Helper function to publish a status message."""
+    status_node = rclpy.create_node("dpvo_status_publisher")
+    status_pub = status_node.create_publisher(String, "reconstructor_status", 10)
+
+    status_msg = String()
+    status_msg.data = status_text
+
+    status_pub.publish(status_msg)
+    status_node.get_logger().info(f"Published status: {status_text}")
+
+    rclpy.spin_once(status_node, timeout_sec=0.5)
+    status_node.destroy_node()
+
+
 def main():
     import argparse
 
@@ -508,67 +525,69 @@ def main():
     parser.add_argument("--save_trajectory", action="store_true")
     args, _ = parser.parse_known_args()
 
-    # Print current directory and arguments.
     print("Current directory: ", os.getcwd())
     print("Arguments: ", args)
 
-    # Initialize the ROS context.
     rclpy.init(args=None)
 
-    # --- Publish DPVO start parameters as a status message ---
-    # Create a temporary node for status publishing.
-    status_node = Node("dpvo_status_publisher")
-    status_pub = status_node.create_publisher(String, "reconstructor_status", 10)
-
-    status_msg = String()
-    # Convert args to a dictionary and then to JSON.
-    status_msg.data = json.dumps(vars(args))
-
-    # Publish the status message.
-    status_pub.publish(status_msg)
-    status_node.get_logger().info("Published DPVO start parameters.")
-    # Spin briefly to ensure the message is sent.
-    rclpy.spin_once(status_node, timeout_sec=0.5)
-    status_node.destroy_node()
-
-    # Continue with your DPVO processing.
-    if args.plot:
-        ros_pub_node = DPVOCombinedPublisher()
-        spin_thread = threading.Thread(
-            target=rclpy.spin, args=(ros_pub_node,), daemon=True
+    def cleanup():
+        """Ensure 'finished' status is published on termination."""
+        publish_status(
+            json.dumps({"status": "finished", "args": vars(args), "method": "dpvo"})
         )
-        spin_thread.start()
-    else:
-        ros_pub_node = None
+        print("\n[INFO] Published 'finished' status before exiting.")
+        if args.plot and ros_pub_node is not None:
+            ros_pub_node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
 
-    # Merge configuration and run DPVO.
-    cfg.merge_from_file(args.config)
-    cfg.merge_from_list(args.opts)
-    print("Running with config:")
-    print(cfg)
+    # Handle termination signals (Ctrl+C and SIGTERM)
+    signal.signal(signal.SIGINT, lambda signum, frame: cleanup())
+    signal.signal(signal.SIGTERM, lambda signum, frame: cleanup())
 
-    (
-        result,
-        extra,
-        trajectory_positions,
-        trajectory_orientations,
-        trajectory_tstamps,
-    ) = run_dpvo(
-        cfg,
-        args.network,
-        args.imagedir,
-        args.calib,
-        args.stride,
-        args.skip,
-        args.viz,
-        args.timeit,
-        ros_pub_node=ros_pub_node,
-    )
+    try:
+        # --- Publish DPVO start parameters as a status message ---
+        publish_status(
+            json.dumps({"status": "started", "args": vars(args), "method": "dpvo"})
+        )
 
-    # (The rest of your code to save trajectories, publish markers, etc., remains unchanged.)
-    if args.plot and ros_pub_node is not None:
-        ros_pub_node.destroy_node()
-    rclpy.shutdown()
+        if args.plot:
+            ros_pub_node = DPVOCombinedPublisher()
+            spin_thread = threading.Thread(
+                target=rclpy.spin, args=(ros_pub_node,), daemon=True
+            )
+            spin_thread.start()
+        else:
+            ros_pub_node = None
+
+        # Merge configuration and run DPVO.
+        cfg.merge_from_file(args.config)
+        cfg.merge_from_list(args.opts)
+        print("Running with config:")
+        print(cfg)
+
+        (
+            result,
+            extra,
+            trajectory_positions,
+            trajectory_orientations,
+            trajectory_tstamps,
+        ) = run_dpvo(
+            cfg,
+            args.network,
+            args.imagedir,
+            args.calib,
+            args.stride,
+            args.skip,
+            args.viz,
+            args.timeit,
+            ros_pub_node=ros_pub_node,
+        )
+
+        cleanup()
+
+    except KeyboardInterrupt:
+        cleanup()
 
 
 if __name__ == "__main__":
